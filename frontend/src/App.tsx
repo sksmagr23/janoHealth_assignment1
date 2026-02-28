@@ -1,9 +1,7 @@
-const App = () => {
-  return (
-    <div>
-      
-    </div>
-  )
-}
+import { Dashboard } from './components/Dashboard';
 
-export default App
+const App = () => {
+  return <Dashboard />;
+};
+
+export default App;
