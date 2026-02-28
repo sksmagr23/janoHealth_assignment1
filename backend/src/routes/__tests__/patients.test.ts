@@ -49,7 +49,6 @@ describe('Patients API', () => {
       const incompleteData = {
         patientId: 'TEST002',
         firstName: 'Test',
-        // Missing other required fields
       };
 
       const response = await request(app)
@@ -66,7 +65,7 @@ describe('Patients API', () => {
         firstName: 'Test',
         lastName: 'Patient',
         dateOfBirth: '1990-01-01',
-        dryWeight: -10, // Invalid weight
+        dryWeight: -10,
         unit: 'Unit-Test',
       };
 
@@ -87,11 +86,9 @@ describe('Patients API', () => {
         dryWeight: 70.5,
         unit: 'Unit-Test',
       };
-
-      // Create first patient
+ 
       await request(app).post('/api/patients').send(patientData).expect(201);
 
-      // Try to create duplicate
       const response = await request(app)
         .post('/api/patients')
         .send(patientData)
