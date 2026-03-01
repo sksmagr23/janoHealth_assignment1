@@ -24,6 +24,6 @@ export const ANOMALY_THRESHOLDS = {
   TARGET_SESSION_DURATION: 240, // 4 hours target
 } as const;
 
-export const MONGODB_URI = process.env.MONGODB_URI;
+export const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/dialysis-center';
 export const PORT = process.env.PORT || 3001;
-export const CORS_ORIGIN = process.env.CORS_ORIGIN;
+export const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';

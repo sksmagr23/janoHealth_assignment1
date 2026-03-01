@@ -1,4 +1,4 @@
-import { Session } from '../types/index';
+import type { Session } from '../types/index.js';
 interface SessionCardProps {
   session: Session;
   onEdit: (session: Session) => void;
@@ -8,13 +8,13 @@ export const SessionCard = ({ session, onEdit }: SessionCardProps) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-600 text-white border-green-500';
       case 'in_progress':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-green-500 text-white border-green-400';
       case 'not_started':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-600 text-white border-gray-500';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-600 text-white border-gray-500';
     }
   };
 
@@ -45,27 +45,31 @@ export const SessionCard = ({ session, onEdit }: SessionCardProps) => {
 
   return (
     <div
-      className={`border rounded-lg p-4 ${
-        session.hasAnomalies ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'
+      className={`rounded-xl p-5 shadow-xl transition-all hover:scale-105 ${
+        session.hasAnomalies
+          ? 'bg-gradient-to-br from-red-900/80 to-red-800/80 border-2 border-red-600'
+          : 'bg-gradient-to-br from-lime-950 to-lime-900 border-2 border-green-600'
       }`}
     >
-      <div className="flex justify-between items-start mb-3">
+      <div className="flex justify-between items-start mb-4">
         <div>
-          <h3 className="font-semibold text-lg">
+          <h3 className="font-bold text-xl text-white mb-1">
             {session.patient?.firstName} {session.patient?.lastName}
           </h3>
-          <p className="text-sm text-gray-600">Patient ID: {session.patientId}</p>
-          <p className="text-sm text-gray-600">Unit: {session.patient?.unit}</p>
+          <p className="text-sm text-gray-300">Patient ID: {session.patientId}</p>
+          <p className="text-sm text-gray-300">Unit: {session.patient?.unit}</p>
         </div>
-        <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(session.status)}`}>
+        <span className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${getStatusColor(session.status)}`}>
           {session.status.replace('_', ' ').toUpperCase()}
         </span>
       </div>
 
       {session.hasAnomalies && (
-        <div className="mb-3 p-2 bg-red-100 border border-red-300 rounded">
-          <p className="text-sm font-semibold text-red-800 mb-1">⚠️ Anomalies Detected:</p>
-          <ul className="text-xs text-red-700 list-disc list-inside">
+        <div className="mb-4 p-3 bg-red-900/50 border-2 border-red-500 rounded-lg">
+          <p className="text-sm font-bold text-red-200 mb-2 flex items-center gap-2">
+            <span className="text-xl">⚠️</span> Anomalies Detected:
+          </p>
+          <ul className="text-xs text-red-100 list-disc list-inside space-y-1">
             {session.anomalies.map((anomaly, idx) => (
               <li key={idx}>{anomaly}</li>
             ))}
@@ -73,44 +77,44 @@ export const SessionCard = ({ session, onEdit }: SessionCardProps) => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+      <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
         <div>
-          <p className="text-gray-600">Scheduled</p>
-          <p className="font-medium">{formatDate(session.scheduledDate)}</p>
+          <p className="text-gray-400 mb-1">Scheduled</p>
+          <p className="font-semibold text-white">{formatDate(session.scheduledDate)}</p>
         </div>
         <div>
-          <p className="text-gray-600">Machine</p>
-          <p className="font-medium">{session.machineId}</p>
+          <p className="text-gray-400 mb-1">Machine</p>
+          <p className="font-semibold text-green-400">{session.machineId}</p>
         </div>
         <div>
-          <p className="text-gray-600">Start Time</p>
-          <p className="font-medium">{formatTime(session.startTime)}</p>
+          <p className="text-gray-400 mb-1">Start Time</p>
+          <p className="font-semibold text-white">{formatTime(session.startTime)}</p>
         </div>
         {session.endTime && (
           <div>
-            <p className="text-gray-600">End Time</p>
-            <p className="font-medium">{formatTime(session.endTime)}</p>
+            <p className="text-gray-400 mb-1">End Time</p>
+            <p className="font-semibold text-white">{formatTime(session.endTime)}</p>
           </div>
         )}
         {calculateDuration() && (
           <div>
-            <p className="text-gray-600">Duration</p>
-            <p className="font-medium">{calculateDuration()}</p>
+            <p className="text-gray-400 mb-1">Duration</p>
+            <p className="font-semibold text-green-400">{calculateDuration()}</p>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+      <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
         <div>
-          <p className="text-gray-600">Pre Weight</p>
-          <p className="font-medium">{session.preWeight} kg</p>
+          <p className="text-gray-400 mb-1">Pre Weight</p>
+          <p className="font-semibold text-white">{session.preWeight} kg</p>
         </div>
         {session.postWeight !== undefined && (
           <div>
-            <p className="text-gray-600">Post Weight</p>
-            <p className="font-medium">{session.postWeight} kg</p>
+            <p className="text-gray-400 mb-1">Post Weight</p>
+            <p className="font-semibold text-white">{session.postWeight} kg</p>
             {session.patient && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-400 mt-1">
                 Target: {session.patient.dryWeight} kg
               </p>
             )}
@@ -119,28 +123,28 @@ export const SessionCard = ({ session, onEdit }: SessionCardProps) => {
       </div>
 
       {session.vitals && (
-        <div className="mb-3 text-sm">
-          <p className="text-gray-600 mb-1">Vitals</p>
+        <div className="mb-4 text-sm">
+          <p className="text-gray-400 mb-2 font-semibold">Vitals</p>
           <div className="grid grid-cols-2 gap-2">
             {session.vitals.pre && (
-              <div className="bg-gray-50 p-2 rounded">
-                <p className="text-xs text-gray-600">Pre</p>
-                <p className="font-medium">
+              <div className="bg-gray-900/50 p-2 rounded border border-green-600">
+                <p className="text-xs text-green-400 font-semibold mb-1">Pre</p>
+                <p className="font-semibold text-white text-xs">
                   BP: {session.vitals.pre.systolicBP}/{session.vitals.pre.diastolicBP}
                 </p>
                 {session.vitals.pre.heartRate && (
-                  <p className="text-xs">HR: {session.vitals.pre.heartRate} bpm</p>
+                  <p className="text-xs text-gray-300 mt-1">HR: {session.vitals.pre.heartRate} bpm</p>
                 )}
               </div>
             )}
             {session.vitals.post && (
-              <div className="bg-gray-50 p-2 rounded">
-                <p className="text-xs text-gray-600">Post</p>
-                <p className="font-medium">
+              <div className="bg-gray-900/50 p-2 rounded border border-green-600">
+                <p className="text-xs text-green-400 font-semibold mb-1">Post</p>
+                <p className="font-semibold text-white text-xs">
                   BP: {session.vitals.post.systolicBP}/{session.vitals.post.diastolicBP}
                 </p>
                 {session.vitals.post.heartRate && (
-                  <p className="text-xs">HR: {session.vitals.post.heartRate} bpm</p>
+                  <p className="text-xs text-gray-300 mt-1">HR: {session.vitals.post.heartRate} bpm</p>
                 )}
               </div>
             )}
@@ -149,15 +153,17 @@ export const SessionCard = ({ session, onEdit }: SessionCardProps) => {
       )}
 
       {session.nurseNotes && (
-        <div className="mb-3 text-sm">
-          <p className="text-gray-600">Notes</p>
-          <p className="text-gray-800 bg-gray-50 p-2 rounded">{session.nurseNotes}</p>
+        <div className="mb-4 text-sm">
+          <p className="text-gray-400 mb-1 font-semibold">Notes</p>
+          <p className="text-gray-200 bg-gray-900/50 p-2 rounded border border-gray-600 text-xs">
+            {session.nurseNotes}
+          </p>
         </div>
       )}
 
       <button
         onClick={() => onEdit(session)}
-        className="w-full mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+        className="w-full mt-3 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-all shadow-lg hover:shadow-green-500/50"
       >
         Edit Session
       </button>

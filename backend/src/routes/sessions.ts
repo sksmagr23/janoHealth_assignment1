@@ -129,6 +129,20 @@ router.post('/', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error recording session:', error);
+    
+    if (error.name === 'ValidationError') {
+      const validationErrors: Record<string, string> = {};
+      Object.keys(error.errors || {}).forEach((key) => {
+        validationErrors[key] = error.errors[key].message;
+      });
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: error.message,
+        errors: validationErrors,
+        details: Object.values(validationErrors).join(', '),
+      });
+    }
+    
     res.status(500).json({ error: 'Failed to record session', details: error.message });
   }
 });
@@ -216,6 +230,21 @@ router.patch('/:id', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error updating session:', error);
+    
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors: Record<string, string> = {};
+      Object.keys(error.errors || {}).forEach((key) => {
+        validationErrors[key] = error.errors[key].message;
+      });
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: error.message,
+        errors: validationErrors,
+        details: Object.values(validationErrors).join(', '),
+      });
+    }
+    
     res.status(500).json({ error: 'Failed to update session', details: error.message });
   }
 });

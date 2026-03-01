@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Session, Patient, CreateSessionRequest, UpdateSessionRequest } from '../types/index';
-import { api } from '../api/client';
+import { useState } from 'react';
+import type { Session, Patient, CreateSessionRequest, UpdateSessionRequest } from '../types/index.js';
+import { api } from '../api/client.js';
+import { useToast } from '../hooks/useToast.js';
+import { ToastContainer } from './Toast.js';
 
 interface SessionFormProps {
   session?: Session | null;
@@ -9,8 +11,22 @@ interface SessionFormProps {
   onCancel: () => void;
 }
 
+type SessionFormData = CreateSessionRequest & Partial<UpdateSessionRequest>;
+
+const VALIDATION_RULES = [
+  { field: 'Weight', rule: 'Must be greater than 0 kg' },
+  { field: 'Blood Pressure', rule: 'Systolic and Diastolic must be ≥ 0 mmHg' },
+  { field: 'Heart Rate', rule: 'Must be ≥ 0 bpm' },
+  { field: 'Session Duration', rule: 'Should be between 150-300 minutes (2.5-5 hours)' },
+  { field: 'Post-Dialysis BP', rule: 'Systolic BP > 140 mmHg will trigger an anomaly alert' },
+  { field: 'Weight Gain', rule: 'Weight gain > 5% of dry weight will trigger an anomaly alert' },
+];
+
 export const SessionForm = ({ session, patients, onSuccess, onCancel }: SessionFormProps) => {
-  const [formData, setFormData] = useState<CreateSessionRequest | UpdateSessionRequest>({
+  const { toasts, showSuccess, showError, removeToast } = useToast();
+  const [showRules, setShowRules] = useState(false);
+  
+  const [formData, setFormData] = useState<SessionFormData>({
     patientId: session?.patientId || '',
     scheduledDate: session?.scheduledDate
       ? new Date(session.scheduledDate).toISOString().split('T')[0]
@@ -28,288 +44,330 @@ export const SessionForm = ({ session, patients, onSuccess, onCancel }: SessionF
   });
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
     try {
       if (session) {
-        // Update existing session
         await api.updateSession(session.id, formData as UpdateSessionRequest);
+        showSuccess('Session updated successfully!');
       } else {
-        // Create new session
         await api.createSession(formData as CreateSessionRequest);
+        showSuccess('Session created successfully!');
       }
-      onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Failed to save session');
+      setTimeout(() => {
+        onSuccess();
+      }, 500);
+    } catch (err: unknown) {
+      let errorMessage = 'Failed to save session';
+      
+      if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = String(err.message);
+        const errorLines = errorMessage.split('\n');
+        errorLines.forEach((line) => {
+          if (line.trim()) {
+            showError(line.trim());
+          }
+        });
+      } else {
+        showError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const updateField = (field: string, value: any) => {
+  const updateField = (field: string, value: string | number | undefined) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const updateVitals = (timing: 'pre' | 'post', field: string, value: number) => {
+    const safeValue = Math.max(0, value || 0);
     setFormData((prev) => ({
       ...prev,
       vitals: {
         ...prev.vitals,
         [timing]: {
           ...(prev.vitals?.[timing] || {}),
-          [field]: value,
+          [field]: safeValue,
         },
       },
     }));
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <h2 className="text-2xl font-bold mb-4">
-            {session ? 'Edit Session' : 'Add New Session'}
-          </h2>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Patient *
-              </label>
-              <select
-                required
-                value={formData.patientId}
-                onChange={(e) => updateField('patientId', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                disabled={!!session}
+    <>
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border-2 border-green-600 shadow-2xl">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-bold text-green-400">
+                {session ? 'Edit Session' : 'Add New Session'}
+              </h2>
+              <button
+                onClick={() => setShowRules(!showRules)}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors"
               >
-                <option value="">Select a patient</option>
-                {patients.map((patient) => (
-                  <option key={patient.id} value={patient.patientId}>
-                    {patient.firstName} {patient.lastName} ({patient.patientId})
-                  </option>
-                ))}
-              </select>
+                {showRules ? 'Hide' : 'Show'} Rules
+              </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Scheduled Date *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={formData.scheduledDate}
-                  onChange={(e) => updateField('scheduledDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
+            {showRules && (
+              <div className="mb-6 p-4 bg-green-900/50 border-2 border-green-600 rounded-lg">
+                <h3 className="text-lg font-bold text-green-400 mb-3">📋 Validation Rules & Guidelines</h3>
+                <ul className="space-y-2 text-sm text-green-100">
+                  {VALIDATION_RULES.map((rule, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-green-400 font-bold">•</span>
+                      <span>
+                        <strong className="text-green-300">{rule.field}:</strong> {rule.rule}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Machine ID *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.machineId}
-                  onChange={(e) => updateField('machineId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Start Time *
+                <label className="block text-sm font-semibold text-green-400 mb-2">
+                  Patient *
                 </label>
-                <input
-                  type="datetime-local"
+                <select
                   required
-                  value={formData.startTime}
-                  onChange={(e) => updateField('startTime', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
+                  value={formData.patientId}
+                  onChange={(e) => updateField('patientId', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-800 border-2 border-green-600 rounded-lg text-white focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  disabled={!!session}
+                >
+                  <option value="" className="bg-gray-800">Select a patient</option>
+                  {patients.map((patient) => (
+                    <option key={patient.id} value={patient.patientId} className="bg-gray-800">
+                      {patient.firstName} {patient.lastName} ({patient.patientId})
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  End Time
-                </label>
-                <input
-                  type="datetime-local"
-                  value={formData.endTime || ''}
-                  onChange={(e) => updateField('endTime', e.target.value || undefined)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Pre Weight (kg) *
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  required
-                  value={formData.preWeight}
-                  onChange={(e) => updateField('preWeight', parseFloat(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Post Weight (kg)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={formData.postWeight || ''}
-                  onChange={(e) =>
-                    updateField('postWeight', e.target.value ? parseFloat(e.target.value) : undefined)
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Vitals</label>
               <div className="grid grid-cols-2 gap-4">
-                <div className="border p-3 rounded">
-                  <h4 className="font-medium mb-2">Pre-Dialysis</h4>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs text-gray-600">Systolic BP</label>
-                      <input
-                        type="number"
-                        value={formData.vitals?.pre?.systolicBP || ''}
-                        onChange={(e) =>
-                          updateVitals('pre', 'systolicBP', parseInt(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Diastolic BP</label>
-                      <input
-                        type="number"
-                        value={formData.vitals?.pre?.diastolicBP || ''}
-                        onChange={(e) =>
-                          updateVitals('pre', 'diastolicBP', parseInt(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Heart Rate</label>
-                      <input
-                        type="number"
-                        value={formData.vitals?.pre?.heartRate || ''}
-                        onChange={(e) =>
-                          updateVitals('pre', 'heartRate', parseInt(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                      />
+                <div>
+                  <label className="block text-sm font-semibold text-green-400 mb-2">
+                    Scheduled Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.scheduledDate}
+                    onChange={(e) => updateField('scheduledDate', e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-800 border-2 border-green-600 rounded-lg text-white focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-green-400 mb-2">
+                    Machine ID *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.machineId}
+                    onChange={(e) => updateField('machineId', e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-800 border-2 border-green-600 rounded-lg text-white focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-green-400 mb-2">
+                    Start Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={formData.startTime}
+                    onChange={(e) => updateField('startTime', e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-800 border-2 border-green-600 rounded-lg text-white focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-green-400 mb-2">
+                    End Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={formData.endTime || ''}
+                    onChange={(e) => updateField('endTime', e.target.value || undefined)}
+                    className="w-full px-4 py-3 bg-gray-800 border-2 border-green-600 rounded-lg text-white focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-green-400 mb-2">
+                    Pre Weight (kg) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    required
+                    value={formData.preWeight}
+                    onChange={(e) => updateField('preWeight', Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-full px-4 py-3 bg-gray-800 border-2 border-green-600 rounded-lg text-white focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-green-400 mb-2">
+                    Post Weight (kg)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={formData.postWeight || ''}
+                    onChange={(e) =>
+                      updateField('postWeight', e.target.value ? Math.max(0, parseFloat(e.target.value)) : undefined)
+                    }
+                    className="w-full px-4 py-3 bg-gray-800 border-2 border-green-600 rounded-lg text-white focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-green-400 mb-3">Vitals</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-800 border-2 border-green-600 p-4 rounded-lg">
+                    <h4 className="font-bold text-green-400 mb-3">Pre-Dialysis</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-green-300 block mb-1">Systolic BP (mmHg)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.vitals?.pre?.systolicBP || ''}
+                          onChange={(e) =>
+                            updateVitals('pre', 'systolicBP', parseInt(e.target.value) || 0)
+                          }
+                          className="w-full px-3 py-2 bg-gray-900 border border-green-600 rounded text-white text-sm focus:border-green-400 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-green-300 block mb-1">Diastolic BP (mmHg)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.vitals?.pre?.diastolicBP || ''}
+                          onChange={(e) =>
+                            updateVitals('pre', 'diastolicBP', parseInt(e.target.value) || 0)
+                          }
+                          className="w-full px-3 py-2 bg-gray-900 border border-green-600 rounded text-white text-sm focus:border-green-400 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-green-300 block mb-1">Heart Rate (bpm)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.vitals?.pre?.heartRate || ''}
+                          onChange={(e) =>
+                            updateVitals('pre', 'heartRate', parseInt(e.target.value) || 0)
+                          }
+                          className="w-full px-3 py-2 bg-gray-900 border border-green-600 rounded text-white text-sm focus:border-green-400 focus:outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="border p-3 rounded">
-                  <h4 className="font-medium mb-2">Post-Dialysis</h4>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs text-gray-600">Systolic BP</label>
-                      <input
-                        type="number"
-                        value={formData.vitals?.post?.systolicBP || ''}
-                        onChange={(e) =>
-                          updateVitals('post', 'systolicBP', parseInt(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Diastolic BP</label>
-                      <input
-                        type="number"
-                        value={formData.vitals?.post?.diastolicBP || ''}
-                        onChange={(e) =>
-                          updateVitals('post', 'diastolicBP', parseInt(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Heart Rate</label>
-                      <input
-                        type="number"
-                        value={formData.vitals?.post?.heartRate || ''}
-                        onChange={(e) =>
-                          updateVitals('post', 'heartRate', parseInt(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                      />
+                  <div className="bg-gray-800 border-2 border-green-600 p-4 rounded-lg">
+                    <h4 className="font-bold text-green-400 mb-3">Post-Dialysis</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-green-300 block mb-1">Systolic BP (mmHg)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.vitals?.post?.systolicBP || ''}
+                          onChange={(e) =>
+                            updateVitals('post', 'systolicBP', parseInt(e.target.value) || 0)
+                          }
+                          className="w-full px-3 py-2 bg-gray-900 border border-green-600 rounded text-white text-sm focus:border-green-400 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-green-300 block mb-1">Diastolic BP (mmHg)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.vitals?.post?.diastolicBP || ''}
+                          onChange={(e) =>
+                            updateVitals('post', 'diastolicBP', parseInt(e.target.value) || 0)
+                          }
+                          className="w-full px-3 py-2 bg-gray-900 border border-green-600 rounded text-white text-sm focus:border-green-400 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-green-300 block mb-1">Heart Rate (bpm)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.vitals?.post?.heartRate || ''}
+                          onChange={(e) =>
+                            updateVitals('post', 'heartRate', parseInt(e.target.value) || 0)
+                          }
+                          className="w-full px-3 py-2 bg-gray-900 border border-green-600 rounded text-white text-sm focus:border-green-400 focus:outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => updateField('status', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="not_started">Not Started</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
+              <div>
+                <label className="block text-sm font-semibold text-green-400 mb-2">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => updateField('status', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-800 border-2 border-green-600 rounded-lg text-white focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="not_started" className="bg-gray-800">Not Started</option>
+                  <option value="in_progress" className="bg-gray-800">In Progress</option>
+                  <option value="completed" className="bg-gray-800">Completed</option>
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nurse Notes</label>
-              <textarea
-                value={formData.nurseNotes || ''}
-                onChange={(e) => updateField('nurseNotes', e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-semibold text-green-400 mb-2">Nurse Notes</label>
+                <textarea
+                  value={formData.nurseNotes || ''}
+                  onChange={(e) => updateField('nurseNotes', e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-3 bg-gray-800 border-2 border-green-600 rounded-lg text-white focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
 
-            <div className="flex gap-3 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? 'Saving...' : session ? 'Update Session' : 'Create Session'}
-              </button>
-              <button
-                type="button"
-                onClick={onCancel}
-                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+              <div className="flex gap-4 pt-4">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-green-500/50"
+                >
+                  {loading ? 'Saving...' : session ? 'Update Session' : 'Create Session'}
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-lg transition-all shadow-lg hover:shadow-red-500/50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

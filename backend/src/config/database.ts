@@ -3,13 +3,17 @@ import { MONGODB_URI } from './constants';
 
 export const connectDatabase = async (): Promise<void> => {
   try {
-    if (!MONGODB_URI) {
-      throw new Error('MONGODB_URI is not defined in environment variables.');
+    if (mongoose.connection.readyState === 1) {
+      return;
     }
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    process.exit(1);
+    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST || process.env.VITEST_WORKER_ID;
+    if (!isTestEnv) {
+      process.exit(1);
+    }
+    throw error;
   }
 };

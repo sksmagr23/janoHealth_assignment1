@@ -16,6 +16,7 @@
   "type": "module",
   "dependencies": {
     "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "mongoose": "^9.2.3",
     "swagger-jsdoc": "^6.2.8",
@@ -25,9 +26,9 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^20.11.0",
+    "@types/supertest": "^6.0.2",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.6",
-    "@types/supertest": "^6.0.2",
     "supertest": "^7.0.0",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3",

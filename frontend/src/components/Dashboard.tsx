@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
-import { Session, Patient } from '../types/index';
-import { api, createApiError, type ApiError } from '../api/client';
-import { SessionCard } from './SessionCard';
-import { SessionForm } from './SessionForm';
+import { useState, useEffect, useCallback } from 'react';
+import type { Session, Patient } from '../types/index.js';
+import { api, type ApiError } from '../api/client.js';
+import { SessionCard } from './SessionCard.js';
+import { SessionForm } from './SessionForm.js';
+import { useToast } from '../hooks/useToast.js';
+import { ToastContainer } from './Toast.js';
 
 export const Dashboard = () => {
+  const { toasts, showError, showSuccess, removeToast } = useToast();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,7 +17,7 @@ export const Dashboard = () => {
   const [anomaliesOnly, setAnomaliesOnly] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState<string>('');
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -24,20 +27,23 @@ export const Dashboard = () => {
       ]);
       setSessions(scheduleResponse.sessions);
       setPatients(patientsResponse.patients);
-    } catch (err) {
-      if (err && typeof err === 'object' && 'status' in err) {
-        setError((err as ApiError).message);
-      } else {
-        setError('Failed to load data');
+      if (scheduleResponse.sessions.length > 0) {
+        showSuccess(`Loaded ${scheduleResponse.sessions.length} session(s)`);
       }
+    } catch (err) {
+      const errorMessage = err && typeof err === 'object' && 'status' in err
+        ? (err as ApiError).message
+        : 'Failed to load data';
+      setError(errorMessage);
+      showError(errorMessage);
     } finally {
       setLoading(false);
     }
-  };
+  }, [anomaliesOnly, selectedUnit, showError, showSuccess]);
 
   useEffect(() => {
     loadData();
-  }, [anomaliesOnly, selectedUnit]);
+  }, [loadData]);
 
   const handleEdit = (session: Session) => {
     setSelectedSession(session);
@@ -78,117 +84,127 @@ export const Dashboard = () => {
 
   if (loading && sessions.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading today's schedule...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-green-600 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-green-400 text-xl font-semibold">Loading today's schedule...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950 p-6">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Dialysis Session Dashboard
-          </h1>
-          <p className="text-gray-600">Today's schedule and session management</p>
+        <div className="mb-8 flex items-center gap-4">
+          <img
+            src="/logo.png"
+            alt="Logo"
+            className="h-16 w-16"
+          />
+          <div>
+            <h1 className="text-5xl font-bold text-green-400 mb-2 drop-shadow-lg">
+              Dialysis Session Dashboard
+            </h1>
+            <p className="text-green-300 text-lg">
+              Today's schedule and session management
+            </p>
+          </div>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-            <p className="font-semibold">Error</p>
+          <div className="mb-6 p-5 bg-red-900/50 border-2 border-red-600 text-red-200 rounded-xl shadow-lg">
+            <p className="font-bold text-lg mb-2">Error</p>
             <p>{error}</p>
             <button
               onClick={loadData}
-              className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              className="mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
             >
               Retry
             </button>
           </div>
         )}
 
-        <div className="mb-6 bg-white rounded-lg shadow p-4">
+        <div className="mb-6 bg-gradient-to-r from-teal-900 to-teal-800 rounded-xl shadow-2xl p-6 border-2 border-green-600">
           <div className="flex flex-wrap gap-4 items-center">
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-bold text-green-400 mb-2">
                 Filter by Unit
               </label>
               <select
                 value={selectedUnit}
                 onChange={(e) => setSelectedUnit(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-4 py-3 bg-green-900 border-2 border-green-600 rounded-lg text-white focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
-                <option value="">All Units</option>
+                <option value="" className="bg-green-900">All Units</option>
                 {uniqueUnits.map((unit) => (
-                  <option key={unit} value={unit}>
+                  <option key={unit} value={unit} className="bg-green-900">
                     {unit}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <input
                 type="checkbox"
                 id="anomaliesOnly"
                 checked={anomaliesOnly}
                 onChange={(e) => setAnomaliesOnly(e.target.checked)}
-                className="w-4 h-4"
+                className="w-5 h-5 accent-green-600"
               />
-              <label htmlFor="anomaliesOnly" className="text-sm font-medium text-gray-700">
+              <label htmlFor="anomaliesOnly" className="text-sm font-semibold text-green-400 cursor-pointer">
                 Show only anomalies
               </label>
             </div>
             <button
               onClick={handleAddSession}
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-all shadow-lg hover:shadow-green-500/50"
             >
               + Add Session
             </button>
             <button
               onClick={loadData}
               disabled={loading}
-              className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition disabled:opacity-50"
+              className="px-6 py-3 bg-red-700 hover:bg-red-600 text-white rounded-lg font-bold transition-all disabled:opacity-50 shadow-lg cursor-pointer"
             >
               {loading ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
         </div>
 
-        <div className="mb-6 grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-600 mb-1">Not Started</p>
-            <p className="text-2xl font-bold text-gray-800">{statusCounts.not_started}</p>
+        <div className="mb-8 grid grid-cols-3 gap-6">
+          <div className="bg-gradient-to-br from-green-900 to-green-800 rounded-xl shadow-xl p-6 border-2 border-green-600">
+            <p className="text-sm text-gray-400 mb-2 font-semibold">Not Started</p>
+            <p className="text-4xl font-bold text-green-400">{statusCounts.not_started}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-600 mb-1">In Progress</p>
-            <p className="text-2xl font-bold text-blue-600">{statusCounts.in_progress}</p>
+          <div className="bg-gradient-to-br from-green-900 to-green-800 rounded-xl shadow-xl p-6 border-2 border-green-600">
+            <p className="text-sm text-green-400 mb-2 font-semibold">In Progress</p>
+            <p className="text-4xl font-bold text-green-400">{statusCounts.in_progress}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-600 mb-1">Completed</p>
-            <p className="text-2xl font-bold text-green-600">{statusCounts.completed}</p>
+          <div className="bg-gradient-to-br from-green-900 to-green-800 rounded-xl shadow-xl p-6 border-2 border-green-600">
+            <p className="text-sm text-green-400 mb-2 font-semibold">Completed</p>
+            <p className="text-4xl font-bold text-green-400">{statusCounts.completed}</p>
           </div>
         </div>
 
         {sessions.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-gray-600 text-lg mb-2">No sessions found</p>
-            <p className="text-gray-500 text-sm mb-4">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-700 rounded-xl shadow-2xl p-12 text-center border-2 border-gray-600">
+            <p className="text-gray-300 text-2xl mb-3 font-semibold">No sessions found</p>
+            <p className="text-gray-400 text-lg mb-6">
               {anomaliesOnly
                 ? 'No sessions with anomalies for today'
                 : 'No sessions scheduled for today'}
             </p>
             <button
               onClick={handleAddSession}
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg transition-all shadow-lg hover:shadow-green-500/50"
             >
               Add First Session
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sessions.map((session) => (
               <SessionCard key={session.id} session={session} onEdit={handleEdit} />
             ))}

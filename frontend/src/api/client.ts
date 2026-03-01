@@ -39,11 +39,31 @@ async function fetchApi<T>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: response.statusText }));
-      throw createApiError(
-        errorData.error || `HTTP ${response.status}`,
-        response.status,
-        errorData
-      );
+      
+      let errorMessage = errorData.error || `HTTP ${response.status}`;
+      
+      if (errorData.errors && typeof errorData.errors === 'object') {
+        const validationErrors: string[] = [];
+        Object.keys(errorData.errors).forEach((field) => {
+          const fieldError = errorData.errors[field];
+          if (typeof fieldError === 'string') {
+            validationErrors.push(`${field}: ${fieldError}`);
+          } else if (fieldError?.message) {
+            validationErrors.push(`${field}: ${fieldError.message}`);
+          }
+        });
+        if (validationErrors.length > 0) {
+          errorMessage = validationErrors.join('\n');
+        }
+      } else if (errorData.details) {
+        errorMessage = errorData.details;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      }
+      
+      throw createApiError(errorMessage, response.status, errorData);
     }
 
     return await response.json();
