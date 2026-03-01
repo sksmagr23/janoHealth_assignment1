@@ -2,7 +2,9 @@
 
 A full-stack application for tracking dialysis sessions, managing patient data, and detecting clinical anomalies in real-time.
 
-### Tech Stack
+> ### *Recording of Working Demo*:- [Working Demo](https://drive.google.com/file/d/1iYh4GAIXLk9q250Y1bOyEvMDB1Bc0Mct/view?usp=sharing)
+
+## Tech Stack
 
 - Node.js
 - Express
@@ -48,7 +50,7 @@ A full-stack application for tracking dialysis sessions, managing patient data, 
 5. **Seed the database**
    ```bash
    cd backend
-   npm run seed
+   npm run seed # seed script to database at `backend/sripts/seed.ts`
    ```
 
 6. **Start the backend server**
